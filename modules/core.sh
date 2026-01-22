@@ -142,72 +142,33 @@ install_python_tools() {
 
 install_tmux_config() {
     print_status "Setting up tmux configuration..."
-    
-    local tmux_conf="$USER_HOME/.tmux.conf"
-    if [[ ! -f "$tmux_conf" ]]; then
-        cat > "$tmux_conf" << 'EOF'
-# Better tmux config for development
 
-# Change prefix from C-b to C-a
-unbind C-b
-set-option -g prefix C-a
-bind-key C-a send-prefix
+    local tmux_conf_src="$SCRIPT_DIR/../config/.tmux.conf"
+    local tmux_conf_dst="$USER_HOME/.tmux.conf"
+    local tpm_dir="$USER_HOME/.tmux/plugins/tpm"
 
-# Split panes using | and -
-bind | split-window -h
-bind - split-window -v
-unbind '"'
-unbind %
-
-# Reload config file
-bind r source-file ~/.tmux.conf \; display-message "Config reloaded!"
-
-# Switch panes using Alt-arrow without prefix
-bind -n M-Left select-pane -L
-bind -n M-Right select-pane -R
-bind -n M-Up select-pane -U
-bind -n M-Down select-pane -D
-
-# Enable mouse mode
-set -g mouse on
-
-# Don't rename windows automatically
-set-option -g allow-rename off
-
-# Start window numbering from 1
-set -g base-index 1
-setw -g pane-base-index 1
-
-# Status bar
-set -g status-bg black
-set -g status-fg white
-set -g status-left '[#S] '
-set -g status-right '%Y-%m-%d %H:%M '
-set -g status-left-length 20
-set -g status-right-length 20
-
-# Highlight active window
-setw -g window-status-current-style 'fg=colour1 bg=colour19 bold'
-setw -g window-status-current-format ' #I#[fg=colour249]:#[fg=colour255]#W#[fg=colour249]#F '
-
-# Vi mode
-setw -g mode-keys vi
-bind-key -T copy-mode-vi 'v' send -X begin-selection
-bind-key -T copy-mode-vi 'y' send -X copy-selection-and-cancel
-
-# History
-set -g history-limit 10000
-
-# No delay for escape key press
-set -sg escape-time 0
-
-# Terminal colors
-set -g default-terminal "screen-256color"
-EOF
-        chown "$CURRENT_USER:$CURRENT_USER" "$tmux_conf"
-        print_success "Tmux config created"
+    # Install TPM if not already installed
+    if [[ ! -d "$tpm_dir" ]]; then
+        print_status "Installing TPM (Tmux Plugin Manager)..."
+        su - "$CURRENT_USER" -c "git clone https://github.com/tmux-plugins/tpm $tpm_dir"
+        print_success "TPM installed"
     else
-        print_success "Tmux config already exists"
+        print_success "TPM already installed"
+    fi
+
+    # Copy tmux config if it doesn't exist or is different
+    if [[ ! -f "$tmux_conf_dst" ]] || ! cmp -s "$tmux_conf_src" "$tmux_conf_dst"; then
+        cp "$tmux_conf_src" "$tmux_conf_dst"
+        chown "$CURRENT_USER:$CURRENT_USER" "$tmux_conf_dst"
+        print_success "Tmux config installed"
+
+        # Install tmux plugins
+        if [[ -x "$tpm_dir/bin/install_plugins" ]]; then
+            print_status "Installing tmux plugins..."
+            su - "$CURRENT_USER" -c "$tpm_dir/bin/install_plugins" || print_warning "Plugin installation failed (may need to run manually after tmux start)"
+        fi
+    else
+        print_success "Tmux config already up to date"
     fi
 }
 
